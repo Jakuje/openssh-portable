@@ -998,7 +998,7 @@ do_symlink(struct sftp_conn *conn, const char *oldpath, const char *newpath)
 }
 
 int
-do_fsync(struct sftp_conn *conn, u_char *handle, u_int handle_len)
+do_fsync(struct sftp_conn *conn, const u_char *handle, u_int handle_len)
 {
 	struct sshbuf *msg;
 	u_int status, id;

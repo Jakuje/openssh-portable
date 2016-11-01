@@ -1905,6 +1905,7 @@ do_ca_sign(struct passwd *pw, const char *ca_key_path, int prefer_agent,
 #ifdef ENABLE_PKCS11
 	pkcs11_terminate();
 #endif
+	free(ca);
 	exit(0);
 }
 

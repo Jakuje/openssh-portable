@@ -248,6 +248,7 @@ ssh_kex2(struct ssh *ssh, char *host, struct sockaddr *hostaddr, u_short port)
 	    (r = ssh_packet_write_wait(ssh)) != 0)
 		fatal("%s: %s", __func__, ssh_err(r));
 #endif
+	/* XXX free myproposal ?? */
 }
 
 /*

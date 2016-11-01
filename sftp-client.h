@@ -110,7 +110,7 @@ int do_hardlink(struct sftp_conn *, const char *, const char *);
 int do_symlink(struct sftp_conn *, const char *, const char *);
 
 /* Call fsync() on open file 'handle' */
-int do_fsync(struct sftp_conn *conn, u_char *, u_int);
+int do_fsync(struct sftp_conn *conn, const u_char *, u_int);
 
 /*
  * Download 'remote_path' to 'local_path'. Preserve permissions and times
