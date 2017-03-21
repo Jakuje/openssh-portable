@@ -984,7 +984,7 @@ mm_ssh_gssapi_checkmic(Gssctxt *ctx, gss_buffer_t gssbuf, gss_buffer_t gssmic)
 }
 
 int
-mm_ssh_gssapi_userok(char *user)
+mm_ssh_gssapi_userok(char *user, Gssctxt *ctxt)
 {
 	struct sshbuf *m;
 	int r, authenticated = 0;

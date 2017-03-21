@@ -653,6 +653,13 @@ Specifies whether to automatically destroy the user's credentials cache
 on logout.
 The default is
 .Cm yes .
+.It Cm GSSAPIRequiredAuthIndicators
+Allow GSSSAPI authentication only for tickets having set auth-indicator
+to these values. Accepts space separated list of accepted authentication
+indicators for this service.
+The default is
+.Cm none
+meaning no authentication indicators are needed to be present in the tickets.
 .It Cm GSSAPIStrictAcceptorCheck
 Determines whether to be strict about the identity of the GSSAPI acceptor
 a client authenticates against.

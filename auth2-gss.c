@@ -260,7 +260,8 @@ input_gssapi_exchange_complete(int type, u_int32_t plen, struct ssh *ssh)
 	if ((r = sshpkt_get_end(ssh)) != 0)
 		fatal("%s: %s", __func__, ssh_err(r));
 
-	authenticated = PRIVSEP(ssh_gssapi_userok(authctxt->user));
+	authenticated = PRIVSEP(ssh_gssapi_userok(authctxt->user,
+	    authctxt->methoddata));
 
 	if ((!use_privsep || mm_is_monitor()) &&
 	    (displayname = ssh_gssapi_displayname()) != NULL)
@@ -287,6 +288,7 @@ input_gssapi_mic(int type, u_int32_t plen, struct ssh *ssh)
 	u_char *p;
 	size_t len;
 
+	logit("%s: called", __func__);
 	if (authctxt == NULL || (authctxt->methoddata == NULL && !use_privsep))
 		fatal("No authentication or GSSAPI context");
 
@@ -306,7 +308,8 @@ input_gssapi_mic(int type, u_int32_t plen, struct ssh *ssh)
 	gssbuf.length = sshbuf_len(b);
 
 	if (!GSS_ERROR(PRIVSEP(ssh_gssapi_checkmic(gssctxt, &gssbuf, &mic))))
-		authenticated = PRIVSEP(ssh_gssapi_userok(authctxt->user));
+		authenticated = PRIVSEP(ssh_gssapi_userok(authctxt->user,
+		    authctxt->methoddata));
 	else
 		logit("GSSAPI MIC check failed");
 

@@ -60,7 +60,7 @@ int mm_sshkey_verify(const struct sshkey *, const u_char *, size_t,
 OM_uint32 mm_ssh_gssapi_server_ctx(Gssctxt **, gss_OID);
 OM_uint32 mm_ssh_gssapi_accept_ctx(Gssctxt *,
    gss_buffer_desc *, gss_buffer_desc *, OM_uint32 *);
-int mm_ssh_gssapi_userok(char *user);
+int mm_ssh_gssapi_userok(char *user, Gssctxt *ctxt);
 OM_uint32 mm_ssh_gssapi_checkmic(Gssctxt *, gss_buffer_t, gss_buffer_t);
 #endif
 

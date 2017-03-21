@@ -126,6 +126,7 @@ initialize_server_options(ServerOptions *options)
 	options->gss_authentication=-1;
 	options->gss_cleanup_creds = -1;
 	options->gss_strict_acceptor = -1;
+	options->gss_required_auth_indicators = NULL;
 	options->password_authentication = -1;
 	options->kbd_interactive_authentication = -1;
 	options->challenge_response_authentication = -1;
@@ -448,6 +449,7 @@ fill_default_server_options(ServerOptions *options)
 	CLEAR_ON_NONE(options->adm_forced_command);
 	CLEAR_ON_NONE(options->chroot_directory);
 	CLEAR_ON_NONE(options->routing_domain);
+	CLEAR_ON_NONE(options->gss_required_auth_indicators);
 	for (i = 0; i < options->num_host_key_files; i++)
 		CLEAR_ON_NONE(options->host_key_files[i]);
 	for (i = 0; i < options->num_host_cert_files; i++)
@@ -499,7 +501,7 @@ typedef enum {
 	sHostKeyAlgorithms,
 	sClientAliveInterval, sClientAliveCountMax, sAuthorizedKeysFile,
 	sGssAuthentication, sGssCleanupCreds, sGssStrictAcceptor,
-	sAcceptEnv, sSetEnv, sPermitTunnel,
+	sGssRequiredAuthIndicators, sAcceptEnv, sSetEnv, sPermitTunnel,
 	sMatch, sPermitOpen, sPermitListen, sForceCommand, sChrootDirectory,
 	sUsePrivilegeSeparation, sAllowAgentForwarding,
 	sHostCertificate,
@@ -574,10 +576,12 @@ static struct {
 	{ "gssapiauthentication", sGssAuthentication, SSHCFG_ALL },
 	{ "gssapicleanupcredentials", sGssCleanupCreds, SSHCFG_GLOBAL },
 	{ "gssapistrictacceptorcheck", sGssStrictAcceptor, SSHCFG_GLOBAL },
+	{ "gssapirequiredauthindicators", sGssRequiredAuthIndicators, SSHCFG_GLOBAL },
 #else
 	{ "gssapiauthentication", sUnsupported, SSHCFG_ALL },
 	{ "gssapicleanupcredentials", sUnsupported, SSHCFG_GLOBAL },
 	{ "gssapistrictacceptorcheck", sUnsupported, SSHCFG_GLOBAL },
+	{ "gssapirequiredauthindicators", sUnsupported, SSHCFG_GLOBAL },
 #endif
 	{ "passwordauthentication", sPasswordAuthentication, SSHCFG_ALL },
 	{ "kbdinteractiveauthentication", sKbdInteractiveAuthentication, SSHCFG_ALL },
@@ -1491,6 +1495,15 @@ process_server_config_line(ServerOptions *options, char *line,
 	case sGssStrictAcceptor:
 		intptr = &options->gss_strict_acceptor;
 		goto parse_flag;
+
+	case sGssRequiredAuthIndicators:
+		if (cp == NULL || *cp == '\0')
+			fatal("%.200s line %d: Missing argument.",
+			    filename, linenum);
+		len = strspn(cp, WHITESPACE "=");
+		if (*activep && options->gss_required_auth_indicators == NULL)
+			options->gss_required_auth_indicators = xstrdup(cp);
+		return 0;
 
 	case sPasswordAuthentication:
 		intptr = &options->password_authentication;
@@ -2577,6 +2590,7 @@ dump_config(ServerOptions *o)
 #ifdef GSSAPI
 	dump_cfg_fmtint(sGssAuthentication, o->gss_authentication);
 	dump_cfg_fmtint(sGssCleanupCreds, o->gss_cleanup_creds);
+	dump_cfg_string(sGssRequiredAuthIndicators, o->gss_required_auth_indicators);
 #endif
 	dump_cfg_fmtint(sPasswordAuthentication, o->password_authentication);
 	dump_cfg_fmtint(sKbdInteractiveAuthentication,

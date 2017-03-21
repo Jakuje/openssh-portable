@@ -33,6 +33,7 @@
 #include <stdarg.h>
 #include <string.h>
 #include <unistd.h>
+#include <gssapi/gssapi_ext.h>
 
 #include "openbsd-compat/sys-queue.h"
 #include "xmalloc.h"
@@ -354,11 +355,65 @@ ssh_gssapi_do_child(char ***envp, u_int *envsizep)
 	}
 }
 
+/* Handle authentication indicators */
+int
+verify_authentication_indicators(Gssctxt *gssctxt)
+{
+	gss_buffer_desc attr;
+	attr.value = "auth-indicators";
+	attr.length = strlen(attr.value);
+	int authenticated = 0, complete = 0, more = -1;
+	gss_buffer_desc value = {0, NULL};
+	gss_buffer_desc display_value = {0, NULL};
+	char *p, *ap = options.gss_required_auth_indicators;
+	OM_uint32 min_status, maj_status;
+	int accept = 0;
+
+	debug3("%s: entering", __func__);
+
+	/* when not specified, allow the access*/
+	if (options.gss_required_auth_indicators == NULL)
+		return 1;
+
+	debug3("%s: Need GSSAPI Auth Indicators (%s)", __func__,
+	    options.gss_required_auth_indicators);
+	do {
+		maj_status = gss_get_name_attribute(&min_status,
+		    gssctxt->client, &attr, &authenticated,
+		    &complete, &value, &display_value, &more);
+
+		debug3("%s: gss_get_name_attribute = 0x%.8X", __func__, maj_status);
+		/* no auth indicators in the ticket: reject access  */
+		if (maj_status != GSS_S_COMPLETE)
+			break;
+
+		debug3("%s: Ticket authentication indicator value = %s",
+		    __func__, (char *)value.value);
+		for (p = strtok(ap, " "); p; p = strtok(NULL, " ")) {
+			if (strcmp(p, value.value) == 0) {
+				logit("%s: found match %s", __func__,
+					(char *)value.value);
+				accept = 1;
+				break;
+			}
+		}
+		gss_release_buffer(&min_status, &value);
+		gss_release_buffer(&min_status, &display_value);
+	} while (more != 0);
+
+	return accept;
+}
+
 /* Privileged */
 int
-ssh_gssapi_userok(char *user)
+ssh_gssapi_userok(char *user, Gssctxt *ctxt)
 {
 	OM_uint32 lmin;
+
+	if (verify_authentication_indicators(ctxt) == 0) {
+		logit("GSSAPI authentication rejected: missing authentication indicators");
+		return 0;
+	}
 
 	if (gssapi_client.exportedname.length == 0 ||
 	    gssapi_client.exportedname.value == NULL) {
