@@ -80,38 +80,49 @@ rsa_hash_alg_nid(int type)
 }
 
 int
-ssh_rsa_generate_additional_parameters(struct sshkey *key)
+ssh_rsa_generate_additional_parameters(struct sshkey *key, BIGNUM *iqmp)
 {
 	BIGNUM *aux = NULL;
 	BN_CTX *ctx = NULL;
-	BIGNUM d;
+	BIGNUM *d = NULL;
 	int r;
+	const BIGNUM *p, *q, *rsa_d;
+	BIGNUM *dmp1 = NULL, *dmq1 = NULL;
 
 	if (key == NULL || key->rsa == NULL ||
 	    sshkey_type_plain(key->type) != KEY_RSA)
 		return SSH_ERR_INVALID_ARGUMENT;
 
-	if ((ctx = BN_CTX_new()) == NULL)
-		return SSH_ERR_ALLOC_FAIL;
-	if ((aux = BN_new()) == NULL) {
+	RSA_get0_factors(key->rsa, &p, &q);
+	RSA_get0_key(key->rsa, NULL, NULL, &rsa_d);
+
+	if ((ctx = BN_CTX_new()) == NULL ||
+	    (aux = BN_new()) == NULL ||
+	    (d = BN_new()) == NULL ||
+	    (dmp1 = BN_new()) == NULL ||
+	    (dmq1 = BN_new()) == NULL) {
 		r = SSH_ERR_ALLOC_FAIL;
 		goto out;
 	}
 	BN_set_flags(aux, BN_FLG_CONSTTIME);
+	BN_with_flags(d, rsa_d, BN_FLG_CONSTTIME);
 
-	BN_init(&d);
-	BN_with_flags(&d, key->rsa->d, BN_FLG_CONSTTIME);
-
-	if ((BN_sub(aux, key->rsa->q, BN_value_one()) == 0) ||
-	    (BN_mod(key->rsa->dmq1, &d, aux, ctx) == 0) ||
-	    (BN_sub(aux, key->rsa->p, BN_value_one()) == 0) ||
-	    (BN_mod(key->rsa->dmp1, &d, aux, ctx) == 0)) {
+	if ((BN_sub(aux, q, BN_value_one()) == 0) ||
+	    (BN_mod(dmq1, d, aux, ctx) == 0) ||
+	    (BN_sub(aux, p, BN_value_one()) == 0) ||
+	    (BN_mod(dmp1, d, aux, ctx) == 0) ||
+	    (RSA_set0_crt_params(key->rsa, dmp1, dmq1, iqmp) == 0)) {
 		r = SSH_ERR_LIBCRYPTO_ERROR;
 		goto out;
 	}
+	dmp1 = NULL;
+	dmq1 = NULL;
 	r = 0;
  out:
+	BN_free(d);
 	BN_clear_free(aux);
+	BN_clear_free(dmp1);
+	BN_clear_free(dmq1);
 	BN_CTX_free(ctx);
 	return r;
 }
@@ -139,7 +150,7 @@ ssh_rsa_sign(const struct sshkey *key, u_char **sigp, size_t *lenp,
 	if (key == NULL || key->rsa == NULL || hash_alg == -1 ||
 	    sshkey_type_plain(key->type) != KEY_RSA)
 		return SSH_ERR_INVALID_ARGUMENT;
-	if (BN_num_bits(key->rsa->n) < SSH_RSA_MINIMUM_MODULUS_SIZE)
+	if (RSA_bits(key->rsa) < SSH_RSA_MINIMUM_MODULUS_SIZE)
 		return SSH_ERR_KEY_LENGTH;
 	slen = RSA_size(key->rsa);
 	if (slen <= 0 || slen > SSHBUF_MAX_BIGNUM)
@@ -211,7 +222,7 @@ ssh_rsa_verify(const struct sshkey *key,
 	    sshkey_type_plain(key->type) != KEY_RSA ||
 	    sig == NULL || siglen == 0)
 		return SSH_ERR_INVALID_ARGUMENT;
-	if (BN_num_bits(key->rsa->n) < SSH_RSA_MINIMUM_MODULUS_SIZE)
+	if (RSA_bits(key->rsa) < SSH_RSA_MINIMUM_MODULUS_SIZE)
 		return SSH_ERR_KEY_LENGTH;
 
 	if ((b = sshbuf_from(sig, siglen)) == NULL)

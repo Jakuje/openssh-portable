@@ -217,7 +217,7 @@ int	sshkey_parse_private_fileblob_type(struct sshbuf *blob, int type,
     const char *passphrase, struct sshkey **keyp, char **commentp);
 
 /* XXX should be internal, but used by ssh-keygen */
-int ssh_rsa_generate_additional_parameters(struct sshkey *);
+int ssh_rsa_generate_additional_parameters(struct sshkey *, BIGNUM *);
 
 /* stateful keys (e.g. XMSS) */
 #ifdef NO_ATTRIBUTE_ON_PROTOTYPE_ARGS
