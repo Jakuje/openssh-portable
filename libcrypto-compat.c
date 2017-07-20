@@ -424,5 +424,4 @@ RSA *EVP_PKEY_get0_RSA(EVP_PKEY *pkey)
     }
     return pkey->pkey.rsa;
 }
-
 #endif /* OPENSSL_VERSION_NUMBER */
