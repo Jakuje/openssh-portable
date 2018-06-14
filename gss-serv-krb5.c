@@ -147,9 +147,9 @@ ssh_gssapi_krb5_storecreds(ssh_gssapi_client *client)
 		return;
 	}
 #else
-	if ((problem = ssh_krb5_cc_gen(krb_context, &ccache))) {
+	if ((problem = ssh_krb5_cc_new_unique(krb_context, &ccache)) != 0) {
 		errmsg = krb5_get_error_message(krb_context, problem);
-		logit("ssh_krb5_cc_gen(): %.100s", errmsg);
+		logit("ssh_krb5_cc_new_unique(): %.100s", errmsg);
 		krb5_free_error_message(krb_context, errmsg);
 		return;
 	}

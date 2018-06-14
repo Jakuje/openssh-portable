@@ -51,6 +51,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <krb5.h>
+#include <profile.h>
 
 extern ServerOptions	 options;
 
@@ -77,7 +78,7 @@ auth_krb5_password(Authctxt *authctxt, const char *password)
 #endif
 	krb5_error_code problem;
 	krb5_ccache ccache = NULL;
-	int len;
+	char *ticket_name = NULL;
 	char *client, *platform_client;
 	const char *errmsg;
 
@@ -163,7 +164,8 @@ auth_krb5_password(Authctxt *authctxt, const char *password)
 		goto out;
 	}
 
-	problem = ssh_krb5_cc_gen(authctxt->krb5_ctx, &authctxt->krb5_fwd_ccache);
+	problem = ssh_krb5_cc_new_unique(authctxt->krb5_ctx,
+	     &authctxt->krb5_fwd_ccache);
 	if (problem)
 		goto out;
 
@@ -172,18 +174,17 @@ auth_krb5_password(Authctxt *authctxt, const char *password)
 	if (problem)
 		goto out;
 
-	problem= krb5_cc_store_cred(authctxt->krb5_ctx, authctxt->krb5_fwd_ccache,
+	problem = krb5_cc_store_cred(authctxt->krb5_ctx, authctxt->krb5_fwd_ccache,
 				 &creds);
 	if (problem)
 		goto out;
 #endif
 
-	authctxt->krb5_ticket_file = (char *)krb5_cc_get_name(authctxt->krb5_ctx, authctxt->krb5_fwd_ccache);
+	problem = krb5_cc_get_full_name(authctxt->krb5_ctx,
+	    authctxt->krb5_fwd_ccache, &ticket_name);
 
-	len = strlen(authctxt->krb5_ticket_file) + 6;
-	authctxt->krb5_ccname = xmalloc(len);
-	snprintf(authctxt->krb5_ccname, len, "FILE:%s",
-	    authctxt->krb5_ticket_file);
+	authctxt->krb5_ccname = xstrdup(ticket_name);
+	krb5_free_string(authctxt->krb5_ctx, ticket_name);
 
 #ifdef USE_PAM
 	if (options.use_pam)
@@ -237,36 +238,171 @@ krb5_cleanup_proc(Authctxt *authctxt)
 	}
 }
 
-#ifndef HEIMDAL
+
+#if !defined(HEIMDAL)
+int
+ssh_asprintf_append(char **dsc, const char *fmt, ...) {
+	char *src, *old;
+	va_list ap;
+	int i;
+
+	va_start(ap, fmt);
+	i = vasprintf(&src, fmt, ap);
+	va_end(ap);
+
+	if (i == -1 || src == NULL)
+		return -1;
+
+	old = *dsc;
+
+	i = asprintf(dsc, "%s%s", *dsc, src);
+	if (i == -1 || src == NULL) {
+		free(src);
+		return -1;
+	}
+
+	free(old);
+	free(src);
+
+	return i;
+}
+
+int
+ssh_krb5_expand_template(char **result, const char *template) {
+	char *p_n, *p_o, *r, *tmp_template;
+
+	debug3("%s: called, template = %s", __func__, template);
+	if (template == NULL)
+		return -1;
+
+	tmp_template = p_n = p_o = xstrdup(template);
+	r = xstrdup("");
+
+	while ((p_n = strstr(p_o, "%{")) != NULL) {
+
+		*p_n++ = '\0';
+		if (ssh_asprintf_append(&r, "%s", p_o) == -1)
+			goto cleanup;
+
+		if (strncmp(p_n, "{uid}", 5) == 0 || strncmp(p_n, "{euid}", 6) == 0 ||
+			strncmp(p_n, "{USERID}", 8) == 0) {
+			p_o = strchr(p_n, '}') + 1;
+			if (ssh_asprintf_append(&r, "%d", geteuid()) == -1)
+				goto cleanup;
+			continue;
+		}
+		else if (strncmp(p_n, "{TEMP}", 6) == 0) {
+			p_o = strchr(p_n, '}') + 1;
+			if (ssh_asprintf_append(&r, "/tmp") == -1)
+				goto cleanup;
+			continue;
+		} else {
+			p_o = strchr(p_n, '}') + 1;
+			p_o = '\0';
+			debug("%s: unsupported token %s in %s", __func__, p_n, template);
+			/* unknown token, fallback to the default */
+			goto cleanup;
+		}
+	}
+
+	if (ssh_asprintf_append(&r, "%s", p_o) == -1)
+		goto cleanup;
+
+	*result = r;
+	free(tmp_template);
+	return 0;
+
+cleanup:
+	free(r);
+	free(tmp_template);
+	return -1;
+}
+
 krb5_error_code
-ssh_krb5_cc_gen(krb5_context ctx, krb5_ccache *ccache) {
-	int tmpfd, ret, oerrno;
-	char ccname[40];
+ssh_krb5_get_cctemplate(krb5_context ctx, char **ccname) {
+	profile_t p;
+	int ret = 0;
+	char *value = NULL;
+
+	debug3("%s: called", __func__);
+	ret = krb5_get_profile(ctx, &p);
+	if (ret)
+		return ret;
+
+	ret = profile_get_string(p, "libdefaults", "default_ccache_name", NULL, NULL, &value);
+	if (ret)
+		return ret;
+
+	ret = ssh_krb5_expand_template(ccname, value);
+
+	debug3("%s: returning with ccname = %s", __func__, *ccname);
+	return ret;
+}
+
+krb5_error_code
+ssh_krb5_cc_new_unique(krb5_context ctx, krb5_ccache *ccache) {
+	int tmpfd, ret, oerrno, type_len;
+	char *ccname = NULL;
 	mode_t old_umask;
+	char *type = NULL, *colon = NULL;
 
-	ret = snprintf(ccname, sizeof(ccname),
-	    "FILE:/tmp/krb5cc_%d_XXXXXXXXXX", geteuid());
-	if (ret < 0 || (size_t)ret >= sizeof(ccname))
-		return ENOMEM;
+	debug3("%s: called", __func__);
+	ret = ssh_krb5_get_cctemplate(ctx, &ccname);
+	if (ret) {
+		/* Otherwise, go with the old method */
+		ret = asprintf(&ccname,
+		    "FILE:/tmp/krb5cc_%d_XXXXXXXXXX", geteuid());
+		if (ret < 0 || (size_t)ret >= sizeof(ccname))
+			return ENOMEM;
 
-	old_umask = umask(0177);
-	tmpfd = mkstemp(ccname + strlen("FILE:"));
-	oerrno = errno;
-	umask(old_umask);
-	if (tmpfd == -1) {
-		logit("mkstemp(): %.100s", strerror(oerrno));
-		return oerrno;
-	}
-
-	if (fchmod(tmpfd,S_IRUSR | S_IWUSR) == -1) {
+		old_umask = umask(0177);
+		tmpfd = mkstemp(ccname + strlen("FILE:"));
 		oerrno = errno;
-		logit("fchmod(): %.100s", strerror(oerrno));
-		close(tmpfd);
-		return oerrno;
-	}
-	close(tmpfd);
+		umask(old_umask);
+		if (tmpfd == -1) {
+			logit("mkstemp(): %.100s", strerror(oerrno));
+			return oerrno;
+		}
 
-	return (krb5_cc_resolve(ctx, ccname, ccache));
+		if (fchmod(tmpfd,S_IRUSR | S_IWUSR) == -1) {
+			oerrno = errno;
+			logit("fchmod(): %.100s", strerror(oerrno));
+			close(tmpfd);
+			return oerrno;
+		}
+		close(tmpfd);
+	}
+
+	debug3("%s: setting default ccname to %s", __func__, ccname);
+	/* set the default with already expanded user IDs */
+	ret = krb5_cc_set_default_name(ctx, ccname);
+	if (ret)
+		return ret;
+
+	if ((colon = strstr(ccname, ":")) != NULL) {
+		type_len = colon - ccname;
+		type = malloc((type_len + 1) * sizeof(char));
+		if (type == NULL)
+			return ENOMEM;
+		strncpy(type, ccname, type_len);
+		type[type_len] = 0;
+	} else {
+		type = strdup(ccname);
+	}
+
+	debug3("%s: calling cc_new_unique(%s)", __func__, ccname);
+	ret = krb5_cc_new_unique(ctx, type, NULL, ccache);
+	if (ret)
+		return ret;
+
+	/* If we have a credential cache from krb5.conf, we need to switch
+	 * a primary cache for this collection
+	 */
+	if (krb5_cc_support_switch(ctx, type)) {
+		debug3("%s: calling cc_switch(%s)", __func__, ccname);
+		ret = krb5_cc_switch(ctx, *ccache);
+	}
+	return ret;
 }
 #endif /* !HEIMDAL */
 #endif /* KRB5 */
