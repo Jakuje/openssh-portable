@@ -234,7 +234,8 @@ pid_t	subprocess(const char *, struct passwd *,
 int	 sys_auth_passwd(struct ssh *, const char *);
 
 #if defined(KRB5) && !defined(HEIMDAL)
-krb5_error_code ssh_krb5_cc_gen(krb5_context, krb5_ccache *);
+#include <krb5.h>
+krb5_error_code ssh_krb5_cc_new_unique(krb5_context, krb5_ccache *);
 #endif
 
 #endif /* AUTH_H */
