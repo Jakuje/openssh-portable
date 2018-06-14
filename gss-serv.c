@@ -320,22 +320,33 @@ ssh_gssapi_getclient(Gssctxt *ctx, ssh_gssapi_client *client)
 void
 ssh_gssapi_cleanup_creds(void)
 {
-	if (gssapi_client.store.filename != NULL) {
-		/* Unlink probably isn't sufficient */
-		debug("removing gssapi cred file\"%s\"",
-		    gssapi_client.store.filename);
-		unlink(gssapi_client.store.filename);
+	krb5_ccache ccache = NULL;
+	krb5_error_code problem;
+
+	if (gssapi_client.store.data != NULL) {
+		if ((problem = krb5_cc_resolve(gssapi_client.store.data, gssapi_client.store.envval, &ccache))) {
+			debug("%s: krb5_cc_resolve(): %.100s", __func__,
+				krb5_get_err_text(gssapi_client.store.data, problem));
+		} else if ((problem = krb5_cc_destroy(gssapi_client.store.data, ccache))) {
+			debug("%s: krb5_cc_destroy(): %.100s", __func__,
+				krb5_get_err_text(gssapi_client.store.data, problem));
+		} else {
+			krb5_free_context(gssapi_client.store.data);
+			gssapi_client.store.data = NULL;
+		}
 	}
 }
 
 /* As user */
-void
+int
 ssh_gssapi_storecreds(void)
 {
 	if (gssapi_client.mech && gssapi_client.mech->storecreds) {
-		(*gssapi_client.mech->storecreds)(&gssapi_client);
+		return (*gssapi_client.mech->storecreds)(&gssapi_client);
 	} else
 		debug("ssh_gssapi_storecreds: Not a GSSAPI mechanism");
+
+	return 0;
 }
 
 /* This allows GSSAPI methods to do things to the childs environment based

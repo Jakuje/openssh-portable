@@ -1033,7 +1033,8 @@ do_setup_env(struct ssh *ssh, Session *s, const char *shell)
 	/* Allow any GSSAPI methods that we've used to alter
 	 * the childs environment as they see fit
 	 */
-	ssh_gssapi_do_child(&env, &envsize);
+	if (s->authctxt->krb5_set_env)
+		ssh_gssapi_do_child(&env, &envsize);
 #endif
 
 	/* Set basic environment. */
@@ -1105,7 +1106,7 @@ do_setup_env(struct ssh *ssh, Session *s, const char *shell)
 	}
 #endif
 #ifdef KRB5
-	if (s->authctxt->krb5_ccname)
+	if (s->authctxt->krb5_ccname && s->authctxt->krb5_set_env)
 		child_set_env(&env, &envsize, "KRB5CCNAME",
 		    s->authctxt->krb5_ccname);
 #endif

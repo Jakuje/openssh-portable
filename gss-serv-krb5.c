@@ -114,7 +114,7 @@ ssh_gssapi_krb5_userok(ssh_gssapi_client *client, char *name)
 /* This writes out any forwarded credentials from the structure populated
  * during userauth. Called after we have setuid to the user */
 
-static void
+static int
 ssh_gssapi_krb5_storecreds(ssh_gssapi_client *client)
 {
 	krb5_ccache ccache;
@@ -123,14 +123,15 @@ ssh_gssapi_krb5_storecreds(ssh_gssapi_client *client)
 	OM_uint32 maj_status, min_status;
 	int len;
 	const char *errmsg;
+	int set_env = 0;
 
 	if (client->creds == NULL) {
 		debug("No credentials stored");
-		return;
+		return 0;
 	}
 
 	if (ssh_gssapi_krb5_init() == 0)
-		return;
+		return 0;
 
 #ifdef HEIMDAL
 # ifdef HAVE_KRB5_CC_NEW_UNIQUE
@@ -147,11 +148,11 @@ ssh_gssapi_krb5_storecreds(ssh_gssapi_client *client)
 		return;
 	}
 #else
-	if ((problem = ssh_krb5_cc_new_unique(krb_context, &ccache)) != 0) {
+	if ((problem = ssh_krb5_cc_new_unique(krb_context, &ccache, &set_env)) != 0) {
 		errmsg = krb5_get_error_message(krb_context, problem);
 		logit("ssh_krb5_cc_new_unique(): %.100s", errmsg);
 		krb5_free_error_message(krb_context, errmsg);
-		return;
+		return 0;
 	}
 #endif	/* #ifdef HEIMDAL */
 
@@ -160,7 +161,7 @@ ssh_gssapi_krb5_storecreds(ssh_gssapi_client *client)
 		errmsg = krb5_get_error_message(krb_context, problem);
 		logit("krb5_parse_name(): %.100s", errmsg);
 		krb5_free_error_message(krb_context, errmsg);
-		return;
+		return 0;
 	}
 
 	if ((problem = krb5_cc_initialize(krb_context, ccache, princ))) {
@@ -169,7 +170,7 @@ ssh_gssapi_krb5_storecreds(ssh_gssapi_client *client)
 		krb5_free_error_message(krb_context, errmsg);
 		krb5_free_principal(krb_context, princ);
 		krb5_cc_destroy(krb_context, ccache);
-		return;
+		return 0;
 	}
 
 	krb5_free_principal(krb_context, princ);
@@ -178,7 +179,7 @@ ssh_gssapi_krb5_storecreds(ssh_gssapi_client *client)
 	    client->creds, ccache))) {
 		logit("gss_krb5_copy_ccache() failed");
 		krb5_cc_destroy(krb_context, ccache);
-		return;
+		return 0;
 	}
 
 	client->store.filename = xstrdup(krb5_cc_get_name(krb_context, ccache));
@@ -188,13 +189,15 @@ ssh_gssapi_krb5_storecreds(ssh_gssapi_client *client)
 	snprintf(client->store.envval, len, "FILE:%s", client->store.filename);
 
 #ifdef USE_PAM
-	if (options.use_pam)
+	if (options.use_pam && set_env)
 		do_pam_putenv(client->store.envvar, client->store.envval);
 #endif
 
 	krb5_cc_close(krb_context, ccache);
 
-	return;
+	client->store.data = krb_context;
+
+	return set_env;
 }
 
 ssh_gssapi_mech gssapi_kerberos_mech = {

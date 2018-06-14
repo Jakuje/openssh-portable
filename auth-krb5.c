@@ -165,7 +165,7 @@ auth_krb5_password(Authctxt *authctxt, const char *password)
 	}
 
 	problem = ssh_krb5_cc_new_unique(authctxt->krb5_ctx,
-	     &authctxt->krb5_fwd_ccache);
+	     &authctxt->krb5_fwd_ccache, &authctxt->krb5_set_env);
 	if (problem)
 		goto out;
 
@@ -187,7 +187,7 @@ auth_krb5_password(Authctxt *authctxt, const char *password)
 	krb5_free_string(authctxt->krb5_ctx, ticket_name);
 
 #ifdef USE_PAM
-	if (options.use_pam)
+	if (options.use_pam && authctxt->krb5_set_env)
 		do_pam_putenv("KRB5CCNAME", authctxt->krb5_ccname);
 #endif
 
@@ -340,13 +340,15 @@ ssh_krb5_get_cctemplate(krb5_context ctx, char **ccname) {
 }
 
 krb5_error_code
-ssh_krb5_cc_new_unique(krb5_context ctx, krb5_ccache *ccache) {
+ssh_krb5_cc_new_unique(krb5_context ctx, krb5_ccache *ccache, int *need_environment) {
 	int tmpfd, ret, oerrno, type_len;
 	char *ccname = NULL;
 	mode_t old_umask;
 	char *type = NULL, *colon = NULL;
 
 	debug3("%s: called", __func__);
+	if (need_environment)
+		*need_environment = 0;
 	ret = ssh_krb5_get_cctemplate(ctx, &ccname);
 	if (ret) {
 		/* Otherwise, go with the old method */
@@ -370,6 +372,9 @@ ssh_krb5_cc_new_unique(krb5_context ctx, krb5_ccache *ccache) {
 			close(tmpfd);
 			return oerrno;
 		}
+		/* make sure the KRB5CCNAME is set for non-standard location */
+		if (need_environment)
+			*need_environment = 1;
 		close(tmpfd);
 	}
 

@@ -82,6 +82,7 @@ struct Authctxt {
 	krb5_principal	 krb5_user;
 	char		*krb5_ticket_file;
 	char		*krb5_ccname;
+	int		 krb5_set_env;
 #endif
 	struct sshbuf	*loginmsg;
 
@@ -243,6 +244,6 @@ int	 sys_auth_passwd(struct ssh *, const char *);
 
 #if defined(KRB5) && !defined(HEIMDAL)
 #include <krb5.h>
-krb5_error_code ssh_krb5_cc_new_unique(krb5_context, krb5_ccache *);
+krb5_error_code ssh_krb5_cc_new_unique(krb5_context, krb5_ccache *, int *);
 #endif
 #endif
