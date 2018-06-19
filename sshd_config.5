@@ -860,6 +860,12 @@ Specifies whether to automatically destroy the user's ticket cache
 file on logout.
 The default is
 .Cm yes .
+.It Cm KerberosUniqueTicket
+Specifies whether to store the aquired tickets in the per-session credential
+cache or whether to use per-user credential cache, which might overwrite
+tickets aquired in different sessions of the same user.
+The default is
+.Cm no .
 .It Cm KexAlgorithms
 Specifies the available KEX (Key Exchange) algorithms.
 Multiple algorithms must be comma-separated.

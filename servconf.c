@@ -122,6 +122,7 @@ initialize_server_options(ServerOptions *options)
 	options->kerberos_or_local_passwd = -1;
 	options->kerberos_ticket_cleanup = -1;
 	options->kerberos_get_afs_token = -1;
+	options->kerberos_unique_ticket = -1;
 	options->gss_authentication=-1;
 	options->gss_cleanup_creds = -1;
 	options->gss_strict_acceptor = -1;
@@ -315,6 +316,8 @@ fill_default_server_options(ServerOptions *options)
 		options->kerberos_ticket_cleanup = 1;
 	if (options->kerberos_get_afs_token == -1)
 		options->kerberos_get_afs_token = 0;
+	if (options->kerberos_unique_ticket == -1)
+		options->kerberos_unique_ticket = 0;
 	if (options->gss_authentication == -1)
 		options->gss_authentication = 0;
 	if (options->gss_cleanup_creds == -1)
@@ -447,7 +450,8 @@ typedef enum {
 	sPermitRootLogin, sLogFacility, sLogLevel,
 	sRhostsRSAAuthentication, sRSAAuthentication,
 	sKerberosAuthentication, sKerberosOrLocalPasswd, sKerberosTicketCleanup,
-	sKerberosGetAFSToken, sChallengeResponseAuthentication,
+	sKerberosGetAFSToken, sKerberosUniqueTicket,
+	sChallengeResponseAuthentication,
 	sPasswordAuthentication, sKbdInteractiveAuthentication,
 	sListenAddress, sAddressFamily,
 	sPrintMotd, sPrintLastLog, sIgnoreRhosts,
@@ -526,11 +530,13 @@ static struct {
 #else
 	{ "kerberosgetafstoken", sUnsupported, SSHCFG_GLOBAL },
 #endif
+	{ "kerberosuniqueticket", sKerberosUniqueTicket, SSHCFG_GLOBAL },
 #else
 	{ "kerberosauthentication", sUnsupported, SSHCFG_ALL },
 	{ "kerberosorlocalpasswd", sUnsupported, SSHCFG_GLOBAL },
 	{ "kerberosticketcleanup", sUnsupported, SSHCFG_GLOBAL },
 	{ "kerberosgetafstoken", sUnsupported, SSHCFG_GLOBAL },
+	{ "kerberosuniqueticket", sUnsupported, SSHCFG_GLOBAL },
 #endif
 	{ "kerberostgtpassing", sUnsupported, SSHCFG_GLOBAL },
 	{ "afstokenpassing", sUnsupported, SSHCFG_GLOBAL },
@@ -1435,6 +1441,10 @@ process_server_config_line(ServerOptions *options, char *line,
 
 	case sKerberosGetAFSToken:
 		intptr = &options->kerberos_get_afs_token;
+		goto parse_flag;
+
+	case sKerberosUniqueTicket:
+		intptr = &options->kerberos_unique_ticket;
 		goto parse_flag;
 
 	case sGssAuthentication:
@@ -2507,6 +2517,7 @@ dump_config(ServerOptions *o)
 # ifdef USE_AFS
 	dump_cfg_fmtint(sKerberosGetAFSToken, o->kerberos_get_afs_token);
 # endif
+	dump_cfg_fmtint(sKerberosUniqueTicket, o->kerberos_unique_ticket);
 #endif
 #ifdef GSSAPI
 	dump_cfg_fmtint(sGssAuthentication, o->gss_authentication);

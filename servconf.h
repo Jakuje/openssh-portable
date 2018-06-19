@@ -123,6 +123,8 @@ typedef struct {
 						 * file on logout. */
 	int     kerberos_get_afs_token;		/* If true, try to get AFS token if
 						 * authenticated with Kerberos. */
+	int     kerberos_unique_ticket;		/* If true, the aquired ticket will
+						 * be stored in per-session ccache */
 	int     gss_authentication;	/* If true, permit GSSAPI authentication */
 	int     gss_cleanup_creds;	/* If true, destroy cred cache on logout */
 	int     gss_strict_acceptor;	/* If true, restrict the GSSAPI acceptor name */

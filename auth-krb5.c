@@ -223,10 +223,59 @@ auth_krb5_password(Authctxt *authctxt, const char *password)
 void
 krb5_cleanup_proc(Authctxt *authctxt)
 {
+	struct stat krb5_ccname_stat;
+	char krb5_ccname[128], *krb5_ccname_dir_start, *krb5_ccname_dir_end;
+
 	debug("krb5_cleanup_proc called");
 	if (authctxt->krb5_fwd_ccache) {
-		krb5_cc_destroy(authctxt->krb5_ctx, authctxt->krb5_fwd_ccache);
+		krb5_context ctx = authctxt->krb5_ctx;
+		krb5_cccol_cursor cursor;
+		krb5_ccache ccache;
+		int ret;
+
+		/* Avoid race conditions with other processes touching the same collection */
+		//krb5_cccol_lock(ctx);
+
+		krb5_cc_destroy(ctx, authctxt->krb5_fwd_ccache);
 		authctxt->krb5_fwd_ccache = NULL;
+
+		ret = krb5_cccol_cursor_new(ctx, &cursor);
+		if (ret)
+			goto unlock;
+
+		ret = krb5_cccol_cursor_next(ctx, cursor, &ccache);
+		if (ret == 0 && ccache != NULL) {
+			/* There is at least one other ccache in collection
+			 * we can switch to */
+			krb5_cc_switch(ctx, ccache);
+		} else {
+			/* Clean up the collection too */
+			strncpy(krb5_ccname, authctxt->krb5_ccname, sizeof(krb5_ccname) - 10);
+			krb5_ccname_dir_start = strchr(krb5_ccname, ':') + 1;
+			*krb5_ccname_dir_start++ = '\0';
+			if (strcmp(krb5_ccname, "DIR") == 0) {
+
+				strcat(krb5_ccname_dir_start, "/primary");
+
+				if (stat(krb5_ccname_dir_start, &krb5_ccname_stat) == 0) {
+					if (unlink(krb5_ccname_dir_start) == 0) {
+						krb5_ccname_dir_end = strrchr(krb5_ccname_dir_start, '/');
+						*krb5_ccname_dir_end = '\0';
+						if (rmdir(krb5_ccname_dir_start) == -1)
+							debug("cache dir '%s' remove failed: %s",
+							    krb5_ccname_dir_start, strerror(errno));
+					}
+					else
+						debug("cache primary file '%s', remove failed: %s",
+						    krb5_ccname_dir_start, strerror(errno));
+				}
+			}
+		}
+unlock:
+		krb5_cccol_cursor_free(ctx, &cursor);
+
+		/* Release lock */
+		//krb5_cccol_unlock(ctx);
 	}
 	if (authctxt->krb5_user) {
 		krb5_free_principal(authctxt->krb5_ctx, authctxt->krb5_user);
@@ -330,7 +379,7 @@ ssh_krb5_get_cctemplate(krb5_context ctx, char **ccname) {
 		return ret;
 
 	ret = profile_get_string(p, "libdefaults", "default_ccache_name", NULL, NULL, &value);
-	if (ret)
+	if (ret || !value)
 		return ret;
 
 	ret = ssh_krb5_expand_template(ccname, value);
@@ -350,11 +399,15 @@ ssh_krb5_cc_new_unique(krb5_context ctx, krb5_ccache *ccache, int *need_environm
 	if (need_environment)
 		*need_environment = 0;
 	ret = ssh_krb5_get_cctemplate(ctx, &ccname);
-	if (ret) {
+	if (ret || !ccname || options.kerberos_unique_ticket) {
 		/* Otherwise, go with the old method */
+		if (ccname)
+			free(ccname);
+		ccname = NULL;
+
 		ret = asprintf(&ccname,
 		    "FILE:/tmp/krb5cc_%d_XXXXXXXXXX", geteuid());
-		if (ret < 0 || (size_t)ret >= sizeof(ccname))
+		if (ret < 0)
 			return ENOMEM;
 
 		old_umask = umask(0177);
@@ -395,19 +448,25 @@ ssh_krb5_cc_new_unique(krb5_context ctx, krb5_ccache *ccache, int *need_environm
 		type = strdup(ccname);
 	}
 
-	debug3("%s: calling cc_new_unique(%s)", __func__, ccname);
-	ret = krb5_cc_new_unique(ctx, type, NULL, ccache);
-	if (ret)
-		return ret;
-
 	/* If we have a credential cache from krb5.conf, we need to switch
-	 * a primary cache for this collection
+	 * a primary cache for this collection, if it supports that (non-FILE)
 	 */
 	if (krb5_cc_support_switch(ctx, type)) {
-		debug3("%s: calling cc_switch(%s)", __func__, ccname);
-		ret = krb5_cc_switch(ctx, *ccache);
+		debug3("%s: calling cc_new_unique(%s)", __func__, ccname);
+		ret = krb5_cc_new_unique(ctx, type, NULL, ccache);
+		if (ret)
+			return ret;
+
+		debug3("%s: calling cc_switch()", __func__);
+		return krb5_cc_switch(ctx, *ccache);
+	} else {
+		/* Otherwise, we can not create a unique ccname here (either
+		 * it is already unique from above or the type does not support
+		 * collections
+		 */
+		debug3("%s: calling cc_resolve(%s)", __func__, ccname);
+		return (krb5_cc_resolve(ctx, ccname, ccache));
 	}
-	return ret;
 }
 #endif /* !HEIMDAL */
 #endif /* KRB5 */
