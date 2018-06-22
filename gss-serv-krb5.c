@@ -145,7 +145,7 @@ ssh_gssapi_krb5_storecreds(ssh_gssapi_client *client)
 		krb5_get_err_text(krb_context, problem));
 # endif
 		krb5_free_error_message(krb_context, errmsg);
-		return;
+		return 0;
 	}
 #else
 	if ((problem = ssh_krb5_cc_new_unique(krb_context, &ccache, &set_env)) != 0) {
@@ -182,11 +182,13 @@ ssh_gssapi_krb5_storecreds(ssh_gssapi_client *client)
 		return 0;
 	}
 
-	client->store.filename = xstrdup(krb5_cc_get_name(krb_context, ccache));
-	client->store.envvar = "KRB5CCNAME";
-	len = strlen(client->store.filename) + 6;
-	client->store.envval = xmalloc(len);
-	snprintf(client->store.envval, len, "FILE:%s", client->store.filename);
+	if (set_env) {
+		const char *filename = krb5_cc_get_name(krb_context, ccache);
+		client->store.envvar = "KRB5CCNAME";
+		len = strlen(filename) + 6;
+		client->store.envval = xmalloc(len);
+		snprintf(client->store.envval, len, "FILE:%s", filename);
+	}
 
 #ifdef USE_PAM
 	if (options.use_pam && set_env)

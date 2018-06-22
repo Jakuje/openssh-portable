@@ -62,7 +62,6 @@
 #define SSH_GSS_OIDTYPE 0x06
 
 typedef struct {
-	char *filename;
 	char *envvar;
 	char *envval;
 	void *data;
