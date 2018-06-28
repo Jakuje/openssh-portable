@@ -233,15 +233,12 @@ krb5_cleanup_proc(Authctxt *authctxt)
 		krb5_ccache ccache;
 		int ret;
 
-		/* Avoid race conditions with other processes touching the same collection */
-		//krb5_cccol_lock(ctx);
-
 		krb5_cc_destroy(ctx, authctxt->krb5_fwd_ccache);
 		authctxt->krb5_fwd_ccache = NULL;
 
 		ret = krb5_cccol_cursor_new(ctx, &cursor);
 		if (ret)
-			goto unlock;
+			goto out;
 
 		ret = krb5_cccol_cursor_next(ctx, cursor, &ccache);
 		if (ret == 0 && ccache != NULL) {
@@ -271,12 +268,9 @@ krb5_cleanup_proc(Authctxt *authctxt)
 				}
 			}
 		}
-unlock:
 		krb5_cccol_cursor_free(ctx, &cursor);
-
-		/* Release lock */
-		//krb5_cccol_unlock(ctx);
 	}
+out:
 	if (authctxt->krb5_user) {
 		krb5_free_principal(authctxt->krb5_ctx, authctxt->krb5_user);
 		authctxt->krb5_user = NULL;
