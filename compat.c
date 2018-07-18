@@ -186,11 +186,16 @@ proto_spec(const char *spec)
 char *
 compat_cipher_proposal(char *cipher_prop)
 {
+	char *np = NULL;
+
 	if (!(datafellows & SSH_BUG_BIGENDIANAES))
 		return cipher_prop;
 	debug2("%s: original cipher proposal: %s", __func__, cipher_prop);
-	if ((cipher_prop = match_filter_blacklist(cipher_prop, "aes*")) == NULL)
+	np = match_filter_blacklist(cipher_prop, "aes*");
+	if (np == NULL)
 		fatal("match_filter_blacklist failed");
+	free(cipher_prop);
+	cipher_prop = np;
 	debug2("%s: compat cipher proposal: %s", __func__, cipher_prop);
 	if (*cipher_prop == '\0')
 		fatal("No supported ciphers found");
@@ -200,11 +205,16 @@ compat_cipher_proposal(char *cipher_prop)
 char *
 compat_pkalg_proposal(char *pkalg_prop)
 {
+	char *np = NULL;
+
 	if (!(datafellows & SSH_BUG_RSASIGMD5))
 		return pkalg_prop;
 	debug2("%s: original public key proposal: %s", __func__, pkalg_prop);
-	if ((pkalg_prop = match_filter_blacklist(pkalg_prop, "ssh-rsa")) == NULL)
+	np = match_filter_blacklist(pkalg_prop, "ssh-rsa");
+	if (np == NULL)
 		fatal("match_filter_blacklist failed");
+	free(pkalg_prop);
+	pkalg_prop = np;
 	debug2("%s: compat public key proposal: %s", __func__, pkalg_prop);
 	if (*pkalg_prop == '\0')
 		fatal("No supported PK algorithms found");
@@ -217,15 +227,22 @@ compat_kex_proposal(char *p)
 	if ((datafellows & (SSH_BUG_CURVE25519PAD|SSH_OLD_DHGEX)) == 0)
 		return p;
 	debug2("%s: original KEX proposal: %s", __func__, p);
-	if ((datafellows & SSH_BUG_CURVE25519PAD) != 0)
-		if ((p = match_filter_blacklist(p,
-		    "curve25519-sha256@libssh.org")) == NULL)
+	if ((datafellows & SSH_BUG_CURVE25519PAD) != 0) {
+		char *np = match_filter_blacklist(p,
+		    "curve25519-sha256@libssh.org");
+		if (np == NULL)
 			fatal("match_filter_blacklist failed");
+		free(p);
+		p = np;
+	}
 	if ((datafellows & SSH_OLD_DHGEX) != 0) {
-		if ((p = match_filter_blacklist(p,
+		char *np = match_filter_blacklist(p,
 		    "diffie-hellman-group-exchange-sha256,"
-		    "diffie-hellman-group-exchange-sha1")) == NULL)
+		    "diffie-hellman-group-exchange-sha1");
+		if (np == NULL)
 			fatal("match_filter_blacklist failed");
+		free(p);
+		p = np;
 	}
 	debug2("%s: compat KEX proposal: %s", __func__, p);
 	if (*p == '\0')
