@@ -973,7 +973,9 @@ toremote(int argc, char **argv)
 			addargs(&alist, "%s", host);
 			addargs(&alist, "%s", cmd);
 			addargs(&alist, "%s", src);
-			addargs(&alist, "%s%s%s:%s",
+			addargs(&alist,
+			    /* IPv6 address needs to be enclosed with square brackets */
+			    strchr(host, ':') != NULL ? "%s%s[%s]:%s" : "%s%s%s:%s",
 			    tuser ? tuser : "", tuser ? "@" : "",
 			    thost, targ);
 			if (do_local_cmd(&alist) != 0)
