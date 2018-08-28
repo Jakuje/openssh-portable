@@ -1164,6 +1164,7 @@ do_setup_env(struct ssh *ssh, Session *s, const char *shell)
 		}
 		*value++ = '\0';
 		child_set_env(&env, &envsize, cp, value);
+		free(cp);
 	}
 
 	/* SSH_CLIENT deprecated */
