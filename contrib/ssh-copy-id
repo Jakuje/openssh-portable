@@ -112,7 +112,8 @@ do
         usage
   }
 
-  OPT= OPTARG=
+  OPT=''
+  OPTARG=''
   # implement something like getopt to avoid Solaris pain
   case "$1" in
     -i?*|-o?*|-p?*)
