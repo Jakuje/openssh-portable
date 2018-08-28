@@ -722,6 +722,7 @@ deserialise_array(struct sshbuf *m, char ***ap, size_t *np)
 	n = tmp;
 	if (n > 0 && (a = calloc(n, sizeof(*a))) == NULL) {
 		r = SSH_ERR_ALLOC_FAIL;
+		n = 0;
 		goto out;
 	}
 	for (i = 0; i < n; i++) {
