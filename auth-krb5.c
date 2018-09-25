@@ -347,7 +347,7 @@ ssh_krb5_expand_template(char **result, const char *template) {
 			continue;
 		} else {
 			p_o = strchr(p_n, '}') + 1;
-			p_o = '\0';
+			*p_o = '\0';
 			debug("%s: unsupported token %s in %s", __func__, p_n, template);
 			/* unknown token, fallback to the default */
 			goto cleanup;
@@ -449,6 +449,7 @@ ssh_krb5_cc_new_unique(krb5_context ctx, krb5_ccache *ccache) {
 	if (krb5_cc_support_switch(ctx, type)) {
 		debug3("%s: calling cc_new_unique(%s)", __func__, ccname);
 		ret = krb5_cc_new_unique(ctx, type, NULL, ccache);
+		free(type);
 		if (ret)
 			return ret;
 
@@ -459,6 +460,7 @@ ssh_krb5_cc_new_unique(krb5_context ctx, krb5_ccache *ccache) {
 		 * it is already unique from above or the type does not support
 		 * collections
 		 */
+		free(type);
 		debug3("%s: calling cc_resolve(%s)", __func__, ccname);
 		return (krb5_cc_resolve(ctx, ccname, ccache));
 	}
