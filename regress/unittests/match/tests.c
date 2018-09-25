@@ -122,6 +122,40 @@ tests(void)
 	CHECK_FILTER("a,b,c", "b,c", "a");
 	CHECK_FILTER("", "a,b,c", "");
 	TEST_DONE();
+
+#define CHECK_MATCH_LIST(client, server, expected) \
+	do { \
+		u_int next = 0; \
+		char *result; \
+		\
+		result = match_list((client), (server), NULL); \
+		if (expected == NULL ) \
+			ASSERT_PTR_EQ(result, NULL); \
+		else \
+			ASSERT_STRING_EQ(result, expected); \
+		free(result); \
+		\
+		result = match_list((client), (server), next); \
+		if (expected == NULL ) \
+			ASSERT_PTR_EQ(result, NULL); \
+		else \
+			ASSERT_STRING_EQ(result, expected); \
+		free(result); \
+	} while (0)
+
+	TEST_START("match_list");
+	CHECK_MATCH_LIST("", "", NULL);
+	CHECK_MATCH_LIST("", "aa", NULL);
+	CHECK_MATCH_LIST("aa", "", NULL);
+	CHECK_MATCH_LIST("bb", "aa", NULL);
+	CHECK_MATCH_LIST("aa,bb", "cc,dd", NULL);
+	CHECK_MATCH_LIST("aa", "aa", "aa");
+	CHECK_MATCH_LIST("aa,bb", "aa", "aa");
+	CHECK_MATCH_LIST("bb,aa", "aa", "aa");
+	CHECK_MATCH_LIST("aa", "bb,aa", "aa");
+	CHECK_MATCH_LIST("aa", "aa,bb", "aa");
+	TEST_DONE();
+
 /*
  * XXX TODO
  * int      match_host_and_ip(const char *, const char *, const char *);
