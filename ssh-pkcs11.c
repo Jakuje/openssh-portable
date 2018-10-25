@@ -76,6 +76,10 @@ struct pkcs11_key {
 	int			keyid_len;
 };
 
+static int pkcs11_open_session(struct pkcs11_provider *p, CK_ULONG slotidx, char *pin, CK_ULONG user);
+static int pkcs11_fetch_keys(struct pkcs11_provider *p, CK_ULONG slotidx, struct sshkey ***keysp, int *nkeys);
+static int pkcs11_key_included(struct sshkey ***keysp, int *nkeys, struct sshkey *key);
+
 int pkcs11_interactive = 0;
 
 #ifdef HAVE_EC_KEY_METHOD_NEW
@@ -327,6 +331,112 @@ pkcs11_check_obj_bool_attrib(struct pkcs11_key *k11, CK_OBJECT_HANDLE obj,
 	return (0);
 }
 
+int pkcs11_key_is_present(struct pkcs11_key *k11)
+{
+	CK_RV			rv;
+	CK_FUNCTION_LIST	*f;
+	CK_SLOT_INFO		info;
+	CK_TOKEN_INFO		tokeninfo;
+	CK_SESSION_HANDLE	session;
+	CK_SESSION_INFO		sessioninfo;
+
+	f = k11->provider->function_list;
+	rv = f->C_GetSlotInfo(k11->slotidx, &info);
+	if (rv != CKR_OK) {
+		/* The cryptoki is not ready to work with this slot */
+		return -1;
+	}
+	if (!(info.flags & CKF_TOKEN_PRESENT)) {
+		return -1;
+	}
+
+	rv = f->C_GetTokenInfo(k11->slotidx, &tokeninfo);
+	if (rv != CKR_OK) {
+		/* The cryptoki is not ready to work with this token */
+		return -1;
+	}
+	/* TODO check if the fields of the tokeninfo match the stored values */
+
+	session = k11->provider->slotinfo[k11->slotidx].session;
+	rv = f->C_GetSessionInfo(session, &sessioninfo);
+	if (rv != CKR_OK) {
+		/* The cryptoki is not ready to work with this session */
+		return -1;
+	}
+	if (sessioninfo.slotID != k11->slotidx) {
+		return -1;
+	}
+	return 0;
+}
+
+static int pkcs11_reload_key(struct sshkey *key, struct pkcs11_key *k11)
+{
+	unsigned char		*pin = NULL;
+	int			r, i;
+	struct sshkey		**keysp = NULL;
+	int			nkeys = 0;
+
+	/* No need to C_CloseSession(): It is already invalidated */
+
+	pin = read_passphrase("Enter PIN for smart card", RP_USE_ASKPASS);
+	if (!pin)
+		return -1;
+
+	r = pkcs11_open_session(k11->provider, k11->slotidx, pin, CKU_SO);
+
+	explicit_bzero(pin, strlen(pin));
+	free(pin);
+
+	if (r == -1)
+		return -1;
+
+	/* Check that the key we are using is present in the current card */
+	r = pkcs11_fetch_keys(k11->provider, k11->slotidx, &keysp, &nkeys);
+	if (r < 0)
+		return -1;
+
+	r = -1;
+	if (pkcs11_key_included(&keysp, &nkeys, key) == 1)
+		r = 0;
+
+	/* clean up the keys */
+	for (i = 0; i < nkeys; i++)
+		sshkey_free(keysp[i]);
+	free(keysp);
+	return r;
+}
+
+int pkcs11_refresh_key(struct sshkey *key)
+{
+	struct pkcs11_key	*k11;
+
+	switch (key->type) {
+	case KEY_RSA:
+		if ((k11 = RSA_get_ex_data(key->rsa, rsa_idx)) == NULL) {
+			error("RSA_get_ex_data failed for rsa %p", key->rsa);
+			return (-1);
+		}
+		break;
+	case KEY_ECDSA:
+		if ((k11 = EC_KEY_get_ex_data(key->ecdsa, ec_key_idx)) == NULL) {
+			error("EC_KEY_get_ex_data failed for ecdsa %p", key->ecdsa);
+			return (-1);
+		}
+		break;
+	}
+	if (!k11->provider || !k11->provider->valid) {
+		error("no pkcs11 (valid) provider for rsa %p", key->rsa);
+		return (-1);
+	}
+
+	if (pkcs11_key_is_present(k11) == -1)
+		if (pkcs11_reload_key(key, k11) == -1)
+			return -1;
+
+	return 0;
+}
+
+/* openssl callback doing the actual signing operation */
 static int
 pkcs11_get_key(struct pkcs11_key *k11, CK_MECHANISM_TYPE mech_type)
 {

@@ -207,6 +207,7 @@ process_sign(void)
 #ifdef WITH_OPENSSL
 			int ret;
 
+			pkcs11_refresh_key(found);
 			if (key->type == KEY_RSA) {
 				slen = RSA_size(key->rsa);
 				signature = xmalloc(slen);

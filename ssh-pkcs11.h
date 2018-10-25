@@ -34,6 +34,7 @@ struct sshkey *
 	pkcs11_destroy_keypair(char *, char *, unsigned long, unsigned char,
 	    u_int32_t *);
 #endif
+int	pkcs11_refresh_key(struct sshkey *);
 
 #if !defined(WITH_OPENSSL) && defined(ENABLE_PKCS11)
 #undef ENABLE_PKCS11
