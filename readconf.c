@@ -1286,9 +1286,12 @@ parse_keytypes:
 		if (!arg || *arg == '\0')
 			fatal("%.200s line %d: Missing argument.",
 			    filename, linenum);
+		if (opcode == oHostKeyAlgorithms)
+			arg2 = "+-^:";
+		else
+			arg2 = "+-^";
 		if (*arg != '-' &&
-		    !sshkey_names_valid2(*arg == '+' || *arg == '^' ?
-		    arg + 1 : arg, 1))
+		    !sshkey_names_valid2(strchr(arg2, *arg) ? arg + 1 : arg, 1))
 			fatal("%s line %d: Bad key types '%s'.",
 				filename, linenum, arg ? arg : "<NONE>");
 		if (*activep && *charptr == NULL)

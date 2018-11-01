@@ -77,7 +77,7 @@ struct pkcs11_key {
 };
 
 static int pkcs11_open_session(struct pkcs11_provider *p, CK_ULONG slotidx, char *pin, CK_ULONG user);
-static int pkcs11_fetch_keys(struct pkcs11_provider *p, CK_ULONG slotidx, struct sshkey ***keysp, int *nkeys);
+static int pkcs11_fetch_keys(struct pkcs11_provider *p, CK_ULONG slotidx, struct sshkey ***keysp, char ***labelsp, int *nkeys);
 static int pkcs11_key_included(struct sshkey ***keysp, int *nkeys, struct sshkey *key);
 
 int pkcs11_interactive = 0;
@@ -391,7 +391,7 @@ static int pkcs11_reload_key(struct sshkey *key, struct pkcs11_key *k11)
 		return -1;
 
 	/* Check that the key we are using is present in the current card */
-	r = pkcs11_fetch_keys(k11->provider, k11->slotidx, &keysp, &nkeys);
+	r = pkcs11_fetch_keys(k11->provider, k11->slotidx, &keysp, NULL, &nkeys);
 	if (r < 0)
 		return -1;
 

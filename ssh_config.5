@@ -847,6 +847,9 @@ If the specified list begins with a
 .Sq ^
 character, then the specified key types will be placed at the head of the
 default set.
+If the specified list begins with a
+.Sq \&:
+character, then ssh will order the given list based on already known hosts.
 The default for this option is:
 .Bd -literal -offset 3n
 ecdsa-sha2-nistp256-cert-v01@openssh.com,

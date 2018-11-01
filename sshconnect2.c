@@ -103,9 +103,9 @@ verify_host_key_callback(struct sshkey *hostkey, struct ssh *ssh)
 }
 
 static char *
-order_hostkeyalgs(char *host, struct sockaddr *hostaddr, u_short port)
+order_hostkeyalgs(char *host, struct sockaddr *hostaddr, u_short port, char *avail)
 {
-	char *oavail, *avail, *first, *last, *alg, *hostname, *ret;
+	char *oavail, *first, *last, *alg, *hostname, *ret;
 	size_t maxlen;
 	struct hostkeys *hostkeys;
 	int ktype;
@@ -199,9 +199,14 @@ ssh_kex2(struct ssh *ssh, char *host, struct sockaddr *hostaddr, u_short port)
 		/* Query known_hosts and prefer algorithms that appear there */
 		myproposal[PROPOSAL_SERVER_HOST_KEY_ALGS] =
 		    compat_pkalg_proposal(
-		    order_hostkeyalgs(host, hostaddr, port));
+		    order_hostkeyalgs(host, hostaddr, port, options.hostkeyalgorithms));
 	} else {
-		/* Use specified HostkeyAlgorithms exactly */
+		if (*options.hostkeyalgorithms == ':') {
+			char *tmp = options.hostkeyalgorithms;
+			options.hostkeyalgorithms = order_hostkeyalgs(host,
+			    hostaddr, port, options.hostkeyalgorithms + 1);
+			free(tmp);
+		}
 		myproposal[PROPOSAL_SERVER_HOST_KEY_ALGS] =
 		    compat_pkalg_proposal(options.hostkeyalgorithms);
 	}

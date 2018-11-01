@@ -240,7 +240,11 @@ kex_assemble_names(char **listp, const char *def, const char *all)
 
 	list = *listp;
 	*listp = NULL;
-	if (*list == '+') {
+	if (*list == ':') {
+		/* Used in HostKeyAlgorithms to denote the list is supposed to be ordered later */
+		/* Noop here */
+		return 0;
+	} else if (*list == '+') {
 		/* Append names to default list */
 		if ((tmp = kex_names_cat(def, list + 1)) == NULL) {
 			r = SSH_ERR_ALLOC_FAIL;
