@@ -1222,7 +1222,7 @@ ssh_packet_send2_wrapped(struct ssh *ssh)
 	return r;
 }
 
-/* returns non-zero if the specified packet type is usec by KEX */
+/* returns non-zero if the specified packet type is used by KEX */
 static int
 ssh_packet_type_is_kex(u_char type)
 {
