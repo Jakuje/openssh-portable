@@ -143,6 +143,7 @@ pid_t cleanup_pid = 0;
 /* pathname and directory for AUTH_SOCKET */
 char socket_name[PATH_MAX];
 char socket_dir[PATH_MAX];
+int remove_socket_dir = 1;
 
 /* PKCS#11 path whitelist */
 static char *pkcs11_whitelist;
@@ -1016,7 +1017,7 @@ cleanup_socket(void)
 	debug("%s: cleanup", __func__);
 	if (socket_name[0])
 		unlink(socket_name);
-	if (socket_dir[0])
+	if (socket_dir[0] && remove_socket_dir)
 		rmdir(socket_dir);
 }
 
@@ -1203,11 +1204,10 @@ main(int ac, char **av)
 
 	if (agentsocket == NULL) {
 		/* Create private directory for agent socket */
-		mktemp_proto(socket_dir, sizeof(socket_dir));
-		if (mkdtemp(socket_dir) == NULL) {
-			perror("mkdtemp: private socket dir");
-			exit(1);
-		}
+		if (create_private_runtime_directory(socket_dir,
+		    sizeof(socket_dir), &remove_socket_dir) != 0)
+			fatal("%s: Failed to create private runtime directory",
+			    __progname);
 		snprintf(socket_name, sizeof socket_name, "%s/agent.%ld", socket_dir,
 		    (long)parent_pid);
 	} else {
