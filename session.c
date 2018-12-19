@@ -259,16 +259,34 @@ display_loginmsg(void)
 	sshbuf_reset(loginmsg);
 }
 
+char *
+session_get_runtime_directory(void)
+{
+	char *auth_info_file = NULL;
+
+#ifdef USE_PAM
+	auth_info_file = sshpam_get_runtime_directory();
+	if (auth_info_file != NULL)
+		return auth_info_file;
+#endif /* USE_PAM */
+	return xstrdup("/tmp");
+}
+
+#define SSH_AUTH_TEMPLATE "sshauth.XXXXXXXXXXXXXXX"
+
 static void
 prepare_auth_info_file(struct passwd *pw, struct sshbuf *info)
 {
 	int fd = -1, success = 0;
+	char *path = NULL;
 
 	if (!options.expose_userauth_info || info == NULL)
 		return;
 
 	temporarily_use_uid(pw);
-	auth_info_file = xstrdup("/tmp/sshauth.XXXXXXXXXXXXXXX");
+	path = session_get_runtime_directory();
+	xasprintf(&auth_info_file, "%s/" SSH_AUTH_TEMPLATE, path);
+	free(path);
 	if ((fd = mkstemp(auth_info_file)) == -1) {
 		error("%s: mkstemp: %s", __func__, strerror(errno));
 		goto out;
