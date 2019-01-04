@@ -1,3 +1,42 @@
+This is a fork of OpenSSH portable
+===============================================================================
+
+The master branch contains various fixes on the way to be accepted in
+upstream. But there are other branches that are less likely to be accepted
+any time soon, but I would like to keep track of them:
+
+ * gssapi-authentication-indicators : Improve GSSAPI authentication to
+   allow checking for authentication indicators (since Kerberos 1.14)
+   Bug: https://bugzilla.mindrot.org/show_bug.cgi?id=2696
+
+ * jjelen-pkcs11 : Support for PKCS#11 URI (RFC 7512)
+   (Already in Fedora 28 and RHEL8)
+   Bug: https://bugzilla.mindrot.org/show_bug.cgi?id=2817
+
+ * ssh-agent-pkcs11 : Transparently handle token reinsertion in ssh-agent
+   Bug: https://bugzilla.mindrot.org/show_bug.cgi?id=2890
+
+ * kerberos-unique-ccache : Improve handling the kerberos credential
+   caches when authenticating using kerberos/gssapi or forwarding
+   credentials.
+   (Aleady in Fedora and RHEL8)
+   Bug: https://bugzilla.mindrot.org/show_bug.cgi?id=2775
+
+ * run-user : Store the temporary files in XDG_RUNTIME_DIR if available
+   Bug: https://bugzilla.mindrot.org/show_bug.cgi?id=2950
+
+ * gssapi-keyex : GSSAPI Key Exchange mechanisms
+
+===============================================================================
+
+
+
+
+
+
+Original README follows
+=======================
+
 See https://www.openssh.com/releasenotes.html#8.2p1 for the release notes.
 
 Please read https://www.openssh.com/report.html for bug reporting
