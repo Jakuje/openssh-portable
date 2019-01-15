@@ -273,7 +273,7 @@ cipher_init(struct sshcipher_ctx **ccp, const struct sshcipher *cipher,
 
 	cc->cipher = cipher;
 	if ((cc->cipher->flags & CFLAG_CHACHAPOLY) != 0) {
-		ret = chachapoly_init(&cc->cp_ctx, key, keylen);
+		ret = chachapoly_init(&cc->cp_ctx, key, keylen, do_encrypt);
 		goto out;
 	}
 	if ((cc->cipher->flags & CFLAG_NONE) != 0) {
@@ -427,7 +427,7 @@ cipher_free(struct sshcipher_ctx *cc)
 	if (cc == NULL)
 		return;
 	if ((cc->cipher->flags & CFLAG_CHACHAPOLY) != 0)
-		explicit_bzero(&cc->cp_ctx, sizeof(cc->cp_ctx));
+		chachapoly_done(&cc->cp_ctx);
 	else if ((cc->cipher->flags & CFLAG_AESCTR) != 0)
 		explicit_bzero(&cc->ac_ctx, sizeof(cc->ac_ctx));
 #ifdef WITH_OPENSSL

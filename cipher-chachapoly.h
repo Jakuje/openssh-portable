@@ -19,17 +19,25 @@
 #define CHACHA_POLY_AEAD_H
 
 #include <sys/types.h>
+#if defined(WITH_OPENSSL) && defined(HAVE_EVP_CHACHA20)
+#include <openssl/evp.h>
+#else
 #include "chacha.h"
+#endif
 #include "poly1305.h"
 
 #define CHACHA_KEYLEN	32 /* Only 256 bit keys used here */
 
 struct chachapoly_ctx {
+#if defined(WITH_OPENSSL) && defined(HAVE_EVP_CHACHA20)
+	EVP_CIPHER_CTX *main_evp, *header_evp;
+#else
 	struct chacha_ctx main_ctx, header_ctx;
+#endif
 };
 
 int	chachapoly_init(struct chachapoly_ctx *cpctx,
-    const u_char *key, u_int keylen)
+    const u_char *key, u_int keylen, int do_encrypt)
     __attribute__((__bounded__(__buffer__, 2, 3)));
 int	chachapoly_crypt(struct chachapoly_ctx *cpctx, u_int seqnr,
     u_char *dest, const u_char *src, u_int len, u_int aadlen, u_int authlen,
@@ -37,5 +45,6 @@ int	chachapoly_crypt(struct chachapoly_ctx *cpctx, u_int seqnr,
 int	chachapoly_get_length(struct chachapoly_ctx *cpctx,
     u_int *plenp, u_int seqnr, const u_char *cp, u_int len)
     __attribute__((__bounded__(__buffer__, 4, 5)));
+int	chachapoly_done(struct chachapoly_ctx *cpctx);
 
 #endif /* CHACHA_POLY_AEAD_H */
