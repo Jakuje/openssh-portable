@@ -33,6 +33,11 @@ chachapoly_init(struct chachapoly_ctx *ctx,
     const u_char *key, u_int keylen, int do_encrypt)
 {
 	int ret = 0;
+#if defined(WITH_OPENSSL) && defined(EVP_PKEY_POLY1305)
+	static const u_char poly_key[POLY1305_KEYLEN] = "\xc8\xaf\xaa\xc3\x31\xee\x37\x2c\xd6\x08\x2d\xe1\x34\x94\x3b\x17\x47\x10\x13\x0e\x9f\x6f\xea\x8d\x72\x29\x38\x50\xa6\x67\xd8\x6c";
+	u_char poly_tag[POLY1305_TAGLEN];
+	size_t tag_len = POLY1305_TAGLEN;
+#endif
 
 	if (keylen != (32 + 32)) /* 2 x 256 bit keys */
 		return SSH_ERR_INVALID_ARGUMENT;
@@ -58,6 +63,31 @@ chachapoly_init(struct chachapoly_ctx *ctx,
 #else
 	chacha_keysetup(&ctx->main_ctx, key, 256);
 	chacha_keysetup(&ctx->header_ctx, key + 32, 256);
+#endif
+#if defined(WITH_OPENSSL) && defined(EVP_PKEY_POLY1305)
+	if (!(ctx->key = EVP_PKEY_new_mac_key(EVP_PKEY_POLY1305, NULL, poly_key, sizeof(poly_key))))
+		goto out;
+	if (!(ctx->mctx = EVP_MD_CTX_new()))
+		goto out;
+	if (EVP_DigestSignInit(ctx->mctx, &ctx->pctx, NULL, NULL, ctx->key) <= 0)
+		goto out;
+	/* Sanity check */
+	if (EVP_DigestSignFinal(ctx->mctx, NULL, &tag_len) <= 0) {
+		ctx->pctx = NULL;
+		goto out; /* pretend openssl/poly1305 is not supported */
+	}
+	if (tag_len != POLY1305_TAGLEN) {
+		ctx->pctx = NULL;
+		goto out;
+	}
+	if (EVP_DigestSignFinal(ctx->mctx, poly_tag, &tag_len) <= 0) {
+		ctx->pctx = NULL;
+		goto out;
+	}
+	if (memcmp(poly_tag, "\x47\x10\x13\x0e\x9f\x6f\xea\x8d\x72\x29\x38\x50\xa6\x67\xd8\x6c", sizeof(poly_tag)) != 0) {
+		ctx->pctx = NULL;
+		goto out;
+	}
 #endif
 out:
 	if (ret != 0)
@@ -111,6 +141,24 @@ chachapoly_crypt(struct chachapoly_ctx *ctx, u_int seqnr, u_char *dest,
 	if (!do_encrypt) {
 		const u_char *tag = src + aadlen + len;
 
+#if defined(WITH_OPENSSL) && defined(EVP_PKEY_POLY1305)
+		/* avoid openssl poly1305 setup overhead for short messages */
+		if (aadlen + len >= 512 && ctx->pctx != NULL) {
+			size_t tag_len = POLY1305_TAGLEN;
+			if (EVP_PKEY_CTX_ctrl(ctx->pctx, -1, EVP_PKEY_OP_SIGNCTX, EVP_PKEY_CTRL_SET_MAC_KEY, sizeof(poly_key), (void *)poly_key) <= 0)
+				goto out;
+			if (EVP_DigestSignUpdate(ctx->mctx, src, aadlen + len) <= 0)
+				goto out;
+#if 0
+			if (EVP_DigestSignFinal(ctx->mctx, NULL, &tag_len) <= 0)
+				goto out;
+			if (tag_len != POLY1305_TAGLEN)
+				goto out;
+#endif
+			if (EVP_DigestSignFinal(ctx->mctx, expected_tag, &tag_len) <= 0)
+				goto out;
+		} else
+#endif
 		poly1305_auth(expected_tag, src, aadlen + len, poly_key);
 		if (timingsafe_bcmp(expected_tag, tag, POLY1305_TAGLEN) != 0) {
 			r = SSH_ERR_MAC_INVALID;
@@ -146,6 +194,25 @@ chachapoly_crypt(struct chachapoly_ctx *ctx, u_int seqnr, u_char *dest,
 
 	/* If encrypting, calculate and append tag */
 	if (do_encrypt) {
+#if defined(WITH_OPENSSL) && defined(EVP_PKEY_POLY1305)
+		/* avoid openssl poly1305 setup overhead for short messages */
+		if (aadlen + len >= 512 && ctx->pctx != NULL) {
+			size_t tag_len = POLY1305_TAGLEN;
+
+			if (EVP_PKEY_CTX_ctrl(ctx->pctx, -1, EVP_PKEY_OP_SIGNCTX, EVP_PKEY_CTRL_SET_MAC_KEY, sizeof(poly_key), (void *)poly_key) <= 0)
+				goto out;
+			if (EVP_DigestSignUpdate(ctx->mctx, dest, aadlen + len) <= 0)
+				goto out;
+#if 0
+			if (EVP_DigestSignFinal(ctx->mctx, NULL, &tag_len) <= 0)
+				goto out;
+			if (tag_len != POLY1305_TAGLEN)
+				goto out;
+#endif
+			if (EVP_DigestSignFinal(ctx->mctx, dest + aadlen + len, &tag_len) <= 0)
+				goto out;
+		} else
+#endif
 		poly1305_auth(dest + aadlen + len, dest, aadlen + len,
 		    poly_key);
 	}
@@ -183,6 +250,11 @@ chachapoly_get_length(struct chachapoly_ctx *ctx,
 }
 
 int	chachapoly_done(struct chachapoly_ctx *cpctx) {
+#if defined(WITH_OPENSSL) && defined(EVP_PKEY_POLY1305)
+	/* cpctx->pctx should not be freed */
+	EVP_MD_CTX_free(cpctx->mctx);
+	EVP_PKEY_free(cpctx->key);
+#endif
 #if defined(WITH_OPENSSL) && defined(HAVE_EVP_CHACHA20)
 	EVP_CIPHER_CTX_free(cpctx->main_evp);
 	EVP_CIPHER_CTX_free(cpctx->header_evp);

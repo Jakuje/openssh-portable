@@ -34,6 +34,11 @@ struct chachapoly_ctx {
 #else
 	struct chacha_ctx main_ctx, header_ctx;
 #endif
+#if defined(WITH_OPENSSL) && defined(EVP_PKEY_POLY1305)
+	EVP_MD_CTX *mctx;
+	EVP_PKEY_CTX *pctx;
+	EVP_PKEY *key;
+#endif
 };
 
 int	chachapoly_init(struct chachapoly_ctx *cpctx,
