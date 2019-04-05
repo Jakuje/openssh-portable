@@ -1603,6 +1603,9 @@ main(int ac, char **av)
 		free(options.certificate_files[i]);
 		options.certificate_files[i] = NULL;
 	}
+#ifdef ENABLE_PKCS11
+	pkcs11_terminate();
+#endif /* ENABLE_PKCS11 */
 
  skip_connect:
 	exit_status = ssh_session2(ssh, pw);
