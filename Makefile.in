@@ -101,7 +101,7 @@ LIBSSH_OBJS=${LIBOPENSSH_OBJS} \
 	monitor_fdpass.o rijndael.o ssh-dss.o ssh-ecdsa.o ssh-ecdsa-sk.o \
 	ssh-ed25519-sk.o ssh-rsa.o dh.o \
 	msg.o progressmeter.o dns.o entropy.o gss-genr.o umac.o umac128.o \
-	ssh-pkcs11.o smult_curve25519_ref.o \
+	ssh-pkcs11.o ssh-pkcs11-uri.o smult_curve25519_ref.o \
 	poly1305.o chacha.o cipher-chachapoly.o cipher-chachapoly-libcrypto.o \
 	ssh-ed25519.o digest-openssl.o digest-libc.o \
 	hmac.o sc25519.o ge25519.o fe25519.o ed25519.o verify.o hash.o \
@@ -290,6 +290,8 @@ clean:	regressclean
 	rm -f regress/unittests/match/test_match$(EXEEXT)
 	rm -f regress/unittests/utf8/*.o
 	rm -f regress/unittests/utf8/test_utf8$(EXEEXT)
+	rm -f regress/unittests/pkcs11/*.o
+	rm -f regress/unittests/pkcs11/test_pkcs11$(EXEEXT)
 	rm -f regress/misc/kexfuzz/*.o
 	rm -f regress/misc/kexfuzz/kexfuzz$(EXEEXT)
 	rm -f regress/misc/sk-dummy/*.o
@@ -325,6 +327,8 @@ distclean:	regressclean
 	rm -f regress/unittests/match/test_match
 	rm -f regress/unittests/utf8/*.o
 	rm -f regress/unittests/utf8/test_utf8
+	rm -f regress/unittests/pkcs11/*.o
+	rm -f regress/unittests/pkcs11/test_pkcs11
 	rm -f regress/misc/kexfuzz/*.o
 	rm -f regress/misc/kexfuzz/kexfuzz$(EXEEXT)
 	(cd openbsd-compat && $(MAKE) distclean)
@@ -498,6 +502,7 @@ regress-prep:
 	$(MKDIR_P) `pwd`/regress/unittests/kex
 	$(MKDIR_P) `pwd`/regress/unittests/match
 	$(MKDIR_P) `pwd`/regress/unittests/utf8
+	$(MKDIR_P) `pwd`/regress/unittests/pkcs11
 	$(MKDIR_P) `pwd`/regress/misc/kexfuzz
 	$(MKDIR_P) `pwd`/regress/misc/sk-dummy
 	[ -f `pwd`/regress/Makefile ] || \
@@ -636,6 +641,16 @@ regress/unittests/utf8/test_utf8$(EXEEXT): \
 	    regress/unittests/test_helper/libtest_helper.a \
 	    -lssh -lopenbsd-compat -lssh -lopenbsd-compat $(LIBS)
 
+UNITTESTS_TEST_PKCS11_OBJS=\
+	regress/unittests/pkcs11/tests.o
+
+regress/unittests/pkcs11/test_pkcs11$(EXEEXT): \
+    ${UNITTESTS_TEST_PKCS11_OBJS} \
+    regress/unittests/test_helper/libtest_helper.a libssh.a
+	$(LD) -o $@ $(LDFLAGS) $(UNITTESTS_TEST_PKCS11_OBJS) \
+	    regress/unittests/test_helper/libtest_helper.a \
+	    -lssh -lopenbsd-compat -lssh -lopenbsd-compat $(LIBS)
+
 MISC_KEX_FUZZ_OBJS=\
 	regress/misc/kexfuzz/kexfuzz.o \
 	$(SKOBJS)
@@ -677,6 +692,7 @@ regress-unit-binaries: regress-prep $(REGRESSLIBS) \
 	regress/unittests/kex/test_kex$(EXEEXT) \
 	regress/unittests/match/test_match$(EXEEXT) \
 	regress/unittests/utf8/test_utf8$(EXEEXT) \
+	regress/unittests/pkcs11/test_pkcs11$(EXEEXT) \
 	regress/misc/kexfuzz/kexfuzz$(EXEEXT)
 
 tests:	file-tests t-exec interop-tests unit
