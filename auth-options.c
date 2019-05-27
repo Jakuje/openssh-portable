@@ -407,8 +407,10 @@ sshauthopt_parse(const char *opts, const char **errstrp)
 				errstr = "invalid environment string";
 				goto fail;
 			}
-			if ((cp = strdup(opt)) == NULL)
+			if ((cp = strdup(opt)) == NULL) {
+				free(opt);
 				goto alloc_fail;
+			}
 			cp[tmp - opt] = '\0'; /* truncate at '=' */
 			if (!valid_env_name(cp)) {
 				free(cp);
