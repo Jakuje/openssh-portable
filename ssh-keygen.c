@@ -2334,6 +2334,9 @@ update_krl_from_file(struct passwd *pw, const char *file, int wild_ca,
 			freezero(blob, blen);
 			blob = NULL;
 			blen = 0;
+			if (r != 0)
+				fatal("%s: revoke key failed: %s",
+				    __func__, ssh_err(r));
 		} else {
 			if (strncasecmp(cp, "key:", 4) == 0) {
 				cp += 4;
