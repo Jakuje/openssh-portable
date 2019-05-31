@@ -1519,8 +1519,20 @@ do_child(struct ssh *ssh, Session *s, const char *command)
 	extern char **environ;
 	char **env, *argv[ARGV_MAX], remote_id[512];
 	const char *shell, *shell0;
-	struct passwd *pw = s->pw;
+	struct passwd *pw = NULL;
 	int r = 0;
+
+	/* Update the users passwd structure after successful login */
+	pw = pwcopy(getpwnam(s->pw->pw_name));
+	if (pw != NULL) {
+		s->pw = pw;
+		/* Fix also the original location where we copied
+		 * the pw structure from, to be sure. */
+		free(s->authctxt->pw);
+		s->authctxt->pw = pw;
+	} else {
+		pw = s->pw;
+	}
 
 	sshpkt_fmt_connection_id(ssh, remote_id, sizeof(remote_id));
 
