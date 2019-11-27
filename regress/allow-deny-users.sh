@@ -43,3 +43,13 @@ test_auth ""            "$other $me"  true            "user in AllowUsers denied
 test_auth ""            "$me $other"  true            "user in AllowUsers denied"
 test_auth "$me $other"  "$me $other"  false           "user in both DenyUsers and AllowUsers allowed"
 test_auth "$other $me"  "$other $me"  false           "user in both DenyUsers and AllowUsers allowed"
+# Test with hostnames
+IP="UNKNOWN"
+#         DenyUsers         AllowUsers        should_succeed  failure_message
+test_auth "$other $me@$IP"  ""                false           "user in DenyUsers allowed"
+test_auth "$me@$IP $other"  ""                false           "user in DenyUsers allowed"
+test_auth ""                "$other"          false           "user not in AllowUsers allowed"
+test_auth ""                "$other $me@$IP"  true            "user in AllowUsers denied"
+test_auth ""                "$me@$IP $other"  true            "user in AllowUsers denied"
+test_auth "$me@$IP $other"  "$me@$IP $other"  false           "user in both DenyUsers and AllowUsers allowed"
+test_auth "$other $me@$IP"  "$other $me@$IP"  false           "user in both DenyUsers and AllowUsers allowed"
