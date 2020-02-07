@@ -109,7 +109,14 @@ chachapoly_crypt(struct chachapoly_ctx *ctx, u_int seqnr, u_char *dest,
     const u_char *src, u_int len, u_int aadlen, u_int authlen, int do_encrypt)
 {
 #if defined(WITH_OPENSSL) && defined(HAVE_EVP_CHACHA20)
+#if defined(LIBRESSL_VERSION_NUMBER)
+#define CHACHA_IV_OFFSET 4
+	u_char seqbuf[12];
+#else
+#define CHACHA_IV_OFFSET 8
+	/* OpenSSL IV contains also the counter in the first 4 bytes */
 	u_char seqbuf[16];
+#endif
 	int r = SSH_ERR_LIBCRYPTO_ERROR;
 #else
 	u_char seqbuf[8];
@@ -125,7 +132,7 @@ chachapoly_crypt(struct chachapoly_ctx *ctx, u_int seqnr, u_char *dest,
 	memset(poly_key, 0, sizeof(poly_key));
 #if defined(WITH_OPENSSL) && defined(HAVE_EVP_CHACHA20)
 	memset(seqbuf + 0, 0, 8);
-	POKE_U64(seqbuf + 8, seqnr);
+	POKE_U64(seqbuf + CHACHA_IV_OFFSET, seqnr);
 	if (!EVP_CipherInit(ctx->main_evp, NULL, NULL, seqbuf, do_encrypt))
 		goto out;
 	if (EVP_Cipher(ctx->main_evp, poly_key, (u_char *)poly_key, sizeof(poly_key)) < 0)
