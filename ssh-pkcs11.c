@@ -1860,6 +1860,9 @@ pkcs11_register_provider_by_uri(struct pkcs11_uri *uri, char *pin,
 	}
 
 	provider_uri = pkcs11_uri_get(uri);
+	if (pin == NULL && uri->pin != NULL) {
+		pin = uri->pin;
+	}
 	nkeys = 0;
 	for (i = 0; i < p->module->nslots; i++) {
 		token = &p->module->slotinfo[i].token;
@@ -1889,9 +1892,6 @@ pkcs11_register_provider_by_uri(struct pkcs11_uri *uri, char *pin,
 		    provider_uri, (unsigned long)i,
 		    token->label, token->manufacturerID, token->model,
 		    token->serialNumber, token->flags);
-		if (pin == NULL && uri->pin != NULL) {
-			pin = uri->pin;
-		}
 		/*
 		 * open session if not yet openend, login with pin and
 		 * retrieve public keys (if keyp is provided)
@@ -1928,8 +1928,8 @@ pkcs11_register_provider_by_uri(struct pkcs11_uri *uri, char *pin,
 			pkcs11_fetch_certs(p, i, keyp, labelsp, &nkeys, uri);
 			uri->object = label;
 		}
-		pin = NULL; /* Will be cleaned up with URI */
 	}
+	pin = NULL; /* Will be cleaned up with URI */
 
 	/* now owned by caller */
 	*providerp = p;
