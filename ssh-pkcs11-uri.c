@@ -249,6 +249,10 @@ pkcs11_uri_init()
 void
 pkcs11_uri_cleanup(struct pkcs11_uri *pkcs11)
 {
+	if (pkcs11 == NULL) {
+		return;
+	}
+
 	free(pkcs11->id);
 	free(pkcs11->module_path);
 	free(pkcs11->token);
