@@ -569,7 +569,7 @@ main(int argc, char **argv)
 	}
 
 	if (mode == MODE_SFTP && iamremote) {
-		fatal("The server can not be ran in SFTP mode");
+		fatal("The server can not be run in SFTP mode");
 	}
 
 	if ((pwd = getpwuid(userid = getuid())) == NULL)
@@ -1209,7 +1209,7 @@ source_sftp(int argc, char **argv, char *targ, struct sftp_conn *conn, char **re
 	target = make_absolute(target, *remote_path);
 	target_is_dir = remote_is_dir(conn, target);
 	if (targetshouldbedirectory && !target_is_dir) {
-		fatal("Target is not a directory, but more files selected for upload");
+		fatal("Target is not a directory, but multiple files selected for upload");
 	} if (target_is_dir) {
 		abs_dst = path_append(target, filename);
 	} else {
